@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Pinochle Scorecard</title>
+    <!-- Load Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; 
+        }
+        .material-card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.3s ease;
+        }
+        .material-button {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .material-button:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        .material-button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        /* Material Blue */
+        .bg-primary { background-color: #1e3a8a; }
+        .text-primary { color: #1e3a8a; }
+        /* Material Accent Green */
+        .bg-accent { background-color: #059669; }
+        .text-accent { color: #059669; }
+        
+        /* Hide arrows on number inputs */
+        input[type="number"] {
+            -moz-appearance: textfield; 
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Set calculator button size */
+        .calc-btn-base {
+            padding: 1rem;
+            text-align: center;
+            font-size: 1.5rem; /* Increased font size */
+            font-weight: bold;
+            border-radius: 0.75rem;
+            transition: background-color 0.15s;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen p-4 sm:p-6">
+    <div id="app-container" class="max-w-xl mx-auto">
+        
+        <!-- Header & Status -->
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-primary">Double Pinochle Score</h1>
+            <p id="user-id-display" class="text-base text-gray-500 mt-1">Local Persistence</p>
+            <p id="status-message" class="text-lg text-green-700 mt-1 font-bold">
+                Scores are saved directly on your device.
+            </p>
+        </header>
+
+        <!-- Total Scoreboard (Material Card) -->
+        <div class="material-card bg-white rounded-2xl p-6 mb-8 shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Running Total</h2>
+            <div id="game-over-banner" class="hidden text-center mb-4">
+                <!-- Game Over message inserted here -->
+            </div>
+            <div class="flex justify-around items-center space-x-4">
+                <div class="text-center flex-1 p-3 rounded-xl bg-blue-50 border-b-4 border-primary">
+                    <p class="text-lg font-medium text-gray-600">WE</p>
+                    <p id="we-total" class="text-5xl font-black text-primary transition-all duration-300">0</p>
+                </div>
+                <div class="text-center flex-1 p-3 rounded-xl bg-green-50 border-b-4 border-accent">
+                    <p class="text-lg font-medium text-gray-600">THEY</p>
+                    <p id="they-total" class="text-5xl font-black text-accent transition-all duration-300">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- New Reset Button -->
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-700">Hand History</h2>
+            <button onclick="window.openResetConfirmation()"
+                    class="material-button text-base font-semibold py-2 px-4 rounded-full border border-red-500 text-red-600 hover:bg-red-50 transition-colors duration-150">
+                Start New Game / Reset
+            </button>
+        </div>
+
+        <!-- Score History -->
+        <div class="mb-4">
+            <div id="score-history" class="space-y-4">
+                <!-- Score cards will be inserted here by updateUI() -->
+            </div>
+        </div>
+        
+        <!-- Action Button -->
+        <div class="sticky bottom-4 z-10 w-full flex justify-center">
+            <button id="new-hand-button" onclick="window.openModal()"
+                    class="material-button bg-accent text-white font-bold py-4 px-10 rounded-full text-xl shadow-2xl shadow-green-400/50 hover:bg-green-700">
+                + New Hand
+            </button>
+        </div>
+    </div>
+
+    <!-- New Hand Modal (Main Form) -->
+    <div id="new-hand-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="modal-title" class="text-3xl font-bold text-primary mb-4">Input New Hand</h2>
+
+            <!-- CURRENT SCORE INSIDE MODAL -->
+            <div class="material-card bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+                <h3 class="text-xl font-semibold mb-2 text-gray-700 text-center">Current Game Score</h3>
+                <div class="flex justify-around space-x-4">
+                    <div class="text-center flex-1">
+                        <p class="text-base font-medium text-primary">WE</p>
+                        <p id="modal-we-score" class="text-3xl font-black text-primary">0</p>
+                    </div>
+                    <div class="text-center flex-1">
+                        <p class="text-base font-medium text-accent">THEY</p>
+                        <p id="modal-they-score" class="text-3xl font-black text-accent">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <form id="new-hand-form" onsubmit="window.submitNewHand(event)">
+                
+                <!-- Basic Hand Info (Dealer & Trump) -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- Dealer Initial (Picker Trigger) -->
+                    <div class="col-span-1">
+                        <label class="block text-lg font-medium text-gray-700 mb-1">Dealer (Initial)</label>
+                         <button type="button" id="dealer-display-btn" onclick="document.getElementById('dealer-picker-modal').classList.remove('hidden');"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                            Select
+                        </button>
+                    </div>
+                    <!-- Trump -->
+                    <div class="col-span-1">
+                        <label for="trump" class="block text-lg font-medium text-gray-700 mb-1">Declared Trump</label>
+                        <select id="trump" onchange="window.formState.trump = this.value"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center h-[60px]">
+                            <option value="S">♠ Spades</option>
+                            <option value="H">♥ Hearts</option>
+                            <option value="D">♦ Diamonds</option>
+                            <option value="C">♣ Clubs</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Bid Winner & Bid Amount (Side-by-Side) -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- Bid Winner (Picker Trigger) -->
+                    <div class="col-span-1">
+                        <label class="block text-lg font-medium text-gray-700 mb-1">Bid Winner</label>
+                        <button type="button" id="bid-winner-display-btn" onclick="window.openWeTheyPicker('bidWinner');"
+                            class="w-full p-3 border border-primary/50 rounded-lg text-2xl font-bold text-center bg-blue-100 hover:bg-blue-200 transition-colors duration-150 h-[60px]">
+                            We
+                        </button>
+                    </div>
+
+                    <!-- Bid Amount (Bid Picker Trigger) -->
+                    <div class="col-span-1">
+                        <label class="block text-lg font-medium text-gray-700 mb-1">Bid Amount (Points)</label>
+                        <button type="button" id="bid-display-btn" onclick="document.getElementById('bid-picker-modal').classList.remove('hidden');"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                            50
+                        </button>
+                    </div>
+                </div>
+
+
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Meld & Trick Points</h3>
+                
+                <!-- REQUIRED TRICK POINTS DISPLAY -->
+                <div id="required-tricks-container" class="mb-4 p-4 rounded-lg bg-yellow-100 border-l-4 border-yellow-500 hidden">
+                    <p id="required-tricks-message" class="text-lg font-semibold text-yellow-800"></p>
+                </div>
+
+                <!-- Removed Rule Check Message -->
+                
+
+                <!-- Meld Inputs (Picker Triggers) -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- We Meld -->
+                    <div>
+                        <label class="block text-lg font-medium text-primary mb-1">We Meld</label>
+                        <div class="flex space-x-2">
+                             <button type="button" id="weMeldDisplayBtn" onclick="window.openMeldPicker('we');"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                                0
+                            </button>
+                            <button type="button" onclick="window.openCalculator('weMeld');"
+                                class="material-button py-3 px-4 rounded-lg bg-blue-200 text-primary font-bold hover:bg-blue-300 transition-colors h-[60px] text-lg">
+                                Calc
+                            </button>
+                        </div>
+                    </div>
+                    <!-- They Meld -->
+                    <div>
+                        <label class="block text-lg font-medium text-accent mb-1">They Meld</label>
+                        <div class="flex space-x-2">
+                            <button type="button" id="theyMeldDisplayBtn" onclick="window.openMeldPicker('they');"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                                0
+                            </button>
+                            <button type="button" onclick="window.openCalculator('theyMeld');"
+                                class="material-button py-3 px-4 rounded-lg bg-green-200 text-accent font-bold hover:bg-green-300 transition-colors h-[60px] text-lg">
+                                Calc
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tricks Taken Inputs (Linked Picker Triggers) -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- We Tricks (Editable) -->
+                    <div>
+                        <label class="block text-lg font-medium text-primary mb-1">We Trick Pts</label>
+                        <button type="button" id="weTricksDisplayBtn" onclick="window.openTrickPointsPicker('we');"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                            0
+                        </button>
+                    </div>
+                    <!-- They Tricks (Editable) -->
+                    <div>
+                        <label class="block text-lg font-medium text-accent mb-1">They Trick Pts</label>
+                        <button type="button" id="theyTricksDisplayBtn" onclick="window.openTrickPointsPicker('they');"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent text-2xl font-bold text-center flex justify-center items-center bg-gray-50 hover:bg-gray-200 transition-colors duration-150 h-[60px]">
+                            0
+                        </button>
+                        <p class="text-sm text-gray-500 text-center mt-1">Total must be 50 points.</p>
+                    </div>
+                </div>
+
+
+                <!-- Status Message -->
+                <p id="hand-status" class="text-lg text-center text-red-500 mb-4"></p>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-between space-x-4">
+                    <button type="button" onclick="document.getElementById('new-hand-modal').classList.add('hidden');"
+                        class="material-button flex-1 py-3 text-xl font-bold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Cancel</button>
+                    <button type="submit" id="submit-button"
+                        class="material-button flex-1 py-3 text-xl font-bold rounded-xl bg-accent text-white hover:bg-green-700">Calculate & Save</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+    
+    <!-- Calculator Modal -->
+    <div id="calculator-modal" onclick="window.closeModalOnOutsideClick(event, 'calculator-modal')" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-sm p-6">
+            <h2 class="text-3xl font-bold text-primary mb-4 text-center">Addition Calculator</h2>
+            
+            <!-- Display -->
+            <div id="calc-display" class="bg-gray-800 text-white text-5xl font-mono text-right p-4 rounded-xl mb-4 overflow-hidden h-16">
+                0
+            </div>
+            
+            <!-- Calculator Grid -->
+            <div class="grid grid-cols-4 gap-3">
+                <!-- Row 1 -->
+                <button type="button" onclick="window.clearCalculator()" class="calc-btn-base col-span-2 bg-red-400 text-white hover:bg-red-500">C</button>
+                <button type="button" onclick="window.handleCalcInput('0')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">0</button>
+                <button type="button" onclick="window.handleCalcOperator('+')" class="calc-btn-base bg-primary text-white hover:bg-blue-800">+</button>
+                
+                <!-- Row 2 -->
+                <button type="button" onclick="window.handleCalcInput('7')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">7</button>
+                <button type="button" onclick="window.handleCalcInput('8')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">8</button>
+                <button type="button" onclick="window.handleCalcInput('9')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">9</button>
+                <button type="button" onclick="window.calculateResult()" class="calc-btn-base bg-gray-500 text-white hover:bg-gray-600">=</button>
+                
+                <!-- Row 3 -->
+                <button type="button" onclick="window.handleCalcInput('4')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">4</button>
+                <button type="button" onclick="window.handleCalcInput('5')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">5</button>
+                <button type="button" onclick="window.handleCalcInput('6')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">6</button>
+                <button type="button" onclick="window.useCalcResult()" class="calc-btn-base row-span-2 bg-accent text-white hover:bg-green-700 flex items-center justify-center text-xl">Use Result</button>
+                
+                <!-- Row 4 -->
+                <button type="button" onclick="window.handleCalcInput('1')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">1</button>
+                <button type="button" onclick="window.handleCalcInput('2')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">2</button>
+                <button type="button" onclick="window.handleCalcInput('3')" class="calc-btn-base bg-gray-200 hover:bg-gray-300">3</button>
+            </div>
+            
+            <p id="calc-status" class="text-base text-center text-red-500 mt-4"></p>
+        </div>
+    </div>
+
+    <!-- Dealer Picker Modal -->
+    <div id="dealer-picker-modal" onclick="window.closeModalOnOutsideClick(event, 'dealer-picker-modal')" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-3xl font-bold text-primary mb-4">Select Dealer Initial</h2>
+            <div id="dealer-picker-container" class="grid grid-cols-6 gap-3 max-h-80 overflow-y-auto border p-3 rounded-xl">
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button type="button" onclick="document.getElementById('dealer-picker-modal').classList.add('hidden');"
+                    class="material-button py-2 px-4 text-lg font-semibold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- We/They Picker Modal (Reusable) -->
+    <div id="we-they-picker-modal" onclick="window.closeModalOnOutsideClick(event, 'we-they-picker-modal')" data-field="" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-sm p-6 max-h-[90vh]">
+            <h2 id="we-they-picker-title" class="text-3xl font-bold text-primary mb-6 text-center">Select Winner</h2>
+            <div class="flex justify-between space-x-4">
+                <button type="button" onclick="window.selectWeThey('We');"
+                    class="material-button flex-1 py-4 text-2xl font-bold rounded-xl bg-primary text-white hover:bg-blue-800">We</button>
+                <button type="button" onclick="window.selectWeThey('They');"
+                    class="material-button flex-1 py-4 text-2xl font-bold rounded-xl bg-accent text-white hover:bg-green-700">They</button>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button type="button" onclick="document.getElementById('we-they-picker-modal').classList.add('hidden');"
+                    class="material-button py-2 px-4 text-lg font-semibold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bid Picker Modal -->
+    <div id="bid-picker-modal" onclick="window.closeModalOnOutsideClick(event, 'bid-picker-modal')" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-3xl font-bold text-primary mb-4">Select Bid Amount (Points)</h2>
+            <div id="bid-picker-container" class="grid grid-cols-4 sm:grid-cols-5 gap-3 max-h-80 overflow-y-auto border p-3 rounded-xl">
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button type="button" onclick="document.getElementById('bid-picker-modal').classList.add('hidden');"
+                    class="material-button py-2 px-4 text-lg font-semibold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Meld Picker Modal -->
+    <div id="meld-picker-modal" onclick="window.closeModalOnOutsideClick(event, 'meld-picker-modal')" data-side="" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="meld-picker-title" class="text-3xl font-bold text-primary mb-4">Select Meld Score</h2>
+            <div id="meld-picker-container" class="grid grid-cols-6 sm:grid-cols-8 gap-1 max-h-80 overflow-y-auto border p-3 rounded-xl">
+            </div>
+             <p class="text-base text-gray-500 text-center mt-2">Custom steps: 0, 20 - 300 by 1</p>
+            <div class="mt-4 flex justify-end">
+                <button type="button" onclick="document.getElementById('meld-picker-modal').classList.add('hidden');"
+                    class="material-button py-2 px-4 text-lg font-semibold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trick Points Picker Modal -->
+    <div id="trick-points-picker-modal" onclick="window.closeModalOnOutsideClick(event, 'trick-points-picker-modal')" data-side="" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="trick-points-picker-title" class="text-3xl font-bold text-primary mb-4">Select We Trick Points (Total 50)</h2>
+            <div id="trick-points-picker-container" class="grid grid-cols-7 sm:grid-cols-10 gap-2 max-h-80 overflow-y-auto border p-3 rounded-xl">
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button type="button" onclick="document.getElementById('trick-points-picker-modal').classList.add('hidden');"
+                    class="material-button py-2 px-4 text-lg font-semibold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reset Confirmation Modal -->
+    <div id="reset-confirmation-modal" onclick="window.closeModalOnOutsideClick(event, 'reset-confirmation-modal')" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl material-card w-full max-w-sm p-6">
+            <h2 class="text-3xl font-bold text-red-600 mb-4">Confirm New Game</h2>
+            <p class="text-lg text-gray-700 mb-6">Are you sure you want to start a new game? This will **permanently clear all scores and hand history** for this app instance.</p>
+            <div class="flex justify-between space-x-4">
+                <button type="button" onclick="document.getElementById('reset-confirmation-modal').classList.add('hidden');"
+                    class="material-button flex-1 py-3 text-xl font-bold rounded-xl bg-gray-300 text-gray-800 hover:bg-gray-400">Cancel</button>
+                <button type="button" onclick="window.confirmResetGame();"
+                    class="material-button flex-1 py-3 text-xl font-bold rounded-xl bg-red-600 text-white hover:bg-red-700">Yes, Reset Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application JavaScript Logic -->
+    <script>
+        // --- Persistence Key ---
+        const LOCAL_STORAGE_KEY = "pinochle_score_v5";
+
+        // --- Global State and Constants ---
+        const GAME_WIN_SCORE = 500;
+        const MIN_MELD_TO_COUNT = 20; // Minimum meld for non-bidding team to score meld points
+        const MIN_TRICK_PTS_TO_SCORE = 20; // Minimum trick points for ANY team to score points (non-bidding team) OR for bidding team to succeed.
+
+        window.weTotal = 0;
+        window.theyTotal = 0; 
+        window.gameHands = [];
+        window.isEditing = false;
+        window.editingIndex = null; // Index of the hand being edited (null for new hand)
+        window.isGameOver = false;
+
+        window.formState = {
+            bid: 50, weMeld: 0, theyMeld: 0, weTricks: 0, theyTricks: 0, 
+            dealer: 'Select', bidWinner: 'We', trump: 'S' // Default bidWinner to 'We' here
+        };
+        
+        window.calculator = {
+            currentValue: '0', operand: null, operator: null, awaitingNewInput: false, targetField: null 
+        };
+
+        window.BID_OPTIONS = (() => {
+            let options = [];
+            for (let i = 50; i <= 60; i++) { options.push(i); }
+            for (let i = 65; i <= 250; i += 5) { options.push(i); }
+            return options;
+        })();
+        
+        window.MELD_OPTIONS = Array.from({ length: 301 }, (_, i) => i);
+        window.TRICK_OPTIONS = Array.from({ length: 51 }, (_, i) => i);
+        window.DEALER_INITIALS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+
+
+        // --- Local Storage Functions (Persistence Logic) ---
+        
+        window.loadScores = () => {
+            try {
+                const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (storedData) {
+                    const data = JSON.parse(storedData);
+                    window.weTotal = data.weTotal || 0;
+                    window.theyTotal = data.theyTotal || 0; 
+                    window.gameHands = data.hands || [];
+                }
+            } catch (e) {
+                console.error("Error loading from Local Storage:", e);
+            }
+            window.isGameOver = window.weTotal >= GAME_WIN_SCORE || window.theyTotal >= GAME_WIN_SCORE; 
+            window.updateUI();
+        };
+
+        window.saveState = () => {
+            const dataToStore = {
+                weTotal: window.weTotal,
+                theyTotal: window.theyTotal, 
+                hands: window.gameHands
+            };
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToStore));
+            } catch (e) {
+                console.error("Error saving to Local Storage:", e);
+                document.getElementById('status-message').innerHTML = '<span class="font-bold text-red-600">WARNING:</span> Save failed! Local Storage full or unavailable.';
+            }
+        };
+
+        window.saveHand = (handData, handIndex = null) => {
+            
+            // 1. Calculate and update totals based on existing hands
+            let newWeTotal = 0;
+            let newTheyTotal = 0;
+            let newGameHands = [];
+
+            if (handIndex !== null) {
+                // Editing existing hand: Replace it
+                newGameHands = window.gameHands.map((hand, index) => 
+                    index === handIndex ? handData : hand
+                );
+            } else {
+                // Adding new hand: Append it
+                newGameHands = [...window.gameHands, handData];
+            }
+
+            // Recalculate full total
+            newGameHands.forEach(hand => {
+                newWeTotal += hand.weScore;
+                newTheyTotal += hand.theyScore;
+            });
+            
+            window.weTotal = newWeTotal;
+            window.theyTotal = newTheyTotal;
+            window.gameHands = newGameHands;
+
+            window.isGameOver = window.weTotal >= GAME_WIN_SCORE || window.theyTotal >= GAME_WIN_SCORE; 
+            
+            window.saveState(); 
+            window.updateUI(); 
+            
+            document.getElementById('hand-status').textContent = handIndex !== null ? 'Hand edited successfully! Totals recalculated.' : 'Hand saved successfully!';
+            window.isEditing = false;
+            window.editingIndex = null;
+            document.getElementById('new-hand-modal').classList.add('hidden');
+            document.getElementById('hand-status').textContent = '';
+        };
+
+        window.confirmResetGame = () => {
+            document.getElementById('reset-confirmation-modal').classList.add('hidden');
+            
+            window.weTotal = 0;
+            window.theyTotal = 0; 
+            window.gameHands = [];
+            window.isGameOver = false;
+            
+            window.saveState(); 
+            window.updateUI();
+            
+            document.getElementById('status-message').textContent = 'Game reset successfully! New game started.';
+        };
+
+
+        // --- UI & Logic Functions ---
+        window.updateBidDisplay = () => { 
+            document.getElementById('bid-display-btn').textContent = window.formState.bid; 
+            // REMOVED: window.updateRequiredTricksDisplay(); 
+        }
+        window.updateDealerDisplay = () => { document.getElementById('dealer-display-btn').textContent = window.formState.dealer || 'Select'; }
+        window.updateBidWinnerDisplay = () => { 
+            document.getElementById('bid-winner-display-btn').textContent = window.formState.bidWinner; 
+            // REMOVED: window.updateRequiredTricksDisplay(); 
+        }
+        window.updateMeldDisplay = (side) => { 
+            document.getElementById(`${side}MeldDisplayBtn`).textContent = window.formState[`${side}Meld`]; 
+            // Only update the required tricks message if the meld change is for the bidding team
+            if (window.formState.bidWinner.toLowerCase() === side) { 
+                window.updateRequiredTricksDisplay(); 
+            }
+        }
+
+        window.updateRequiredTricksDisplay = () => {
+            const bidWinner = window.formState.bidWinner; // "We" or "They"
+            const winnerKey = bidWinner.toLowerCase(); // 'we' or 'they'
+            const winnerMeld = window.formState[`${winnerKey}Meld`];
+            const bid = window.formState.bid;
+            
+            const tricksNeededRaw = bid - winnerMeld;
+            // The required trick points is the maximum of the MIN_TRICK_PTS_TO_SCORE (20) and the points needed to cover the bid.
+            const tricksNeededFinal = Math.max(MIN_TRICK_PTS_TO_SCORE, tricksNeededRaw); 
+
+            const container = document.getElementById('required-tricks-container');
+            const message = document.getElementById('required-tricks-message');
+            
+            container.classList.remove('hidden');
+            container.classList.remove('bg-green-100', 'border-accent', 'bg-yellow-100', 'border-yellow-500');
+            
+            let tricksDisplay;
+            let verb = "needs";
+
+            if (tricksNeededFinal > 50) {
+                 // Bid is impossible (e.g., bid 100, meld 0 -> needs 100)
+                 tricksDisplay = tricksNeededFinal;
+                 message.innerHTML = `${bidWinner} ${verb} <span class="text-2xl font-black text-red-600">${tricksDisplay}</span> points, but only 50 are available! Cannot make the bid.`;
+                 container.classList.add('bg-yellow-100', 'border-yellow-500');
+            } else if (tricksNeededRaw <= 0) {
+                 // Bid is secured by meld alone, but still requires the 20 trick minimum
+                 tricksDisplay = MIN_TRICK_PTS_TO_SCORE;
+                 message.innerHTML = `${bidWinner} ${verb} a minimum of <span class="text-2xl font-black text-accent">${tricksDisplay}</span> trick points to keep the score (Bid secured by Meld).`;
+                 container.classList.add('bg-green-100', 'border-accent');
+            } else {
+                 // Standard tricks needed (which will be >= 20 due to Math.max)
+                 tricksDisplay = tricksNeededFinal;
+                 message.innerHTML = `${bidWinner} ${verb} a minimum of <span class="text-2xl font-black text-primary">${tricksDisplay}</span> trick points to make the bid.`;
+                 container.classList.add('bg-yellow-100', 'border-yellow-500');
+            }
+        }
+
+
+        window.updateTrickPointsDisplay = () => {
+            document.getElementById('weTricksDisplayBtn').textContent = window.formState.weTricks;
+            document.getElementById('theyTricksDisplayBtn').textContent = window.formState.theyTricks; 
+        }
+        
+        window.updateModalScore = () => {
+            document.getElementById('modal-we-score').textContent = window.weTotal.toLocaleString();
+            document.getElementById('modal-they-score').textContent = window.theyTotal.toLocaleString();
+        }
+
+        window.handleTricksInput = (side, value) => {
+            const totalTrickPoints = 50; 
+            const numValue = parseInt(value);
+            
+            if (isNaN(numValue) || numValue < 0 || numValue > totalTrickPoints) return;
+
+            if (side === 'we') {
+                window.formState.weTricks = numValue;
+                let theyTricks = totalTrickPoints - numValue;
+                window.formState.theyTricks = theyTricks; 
+            } else if (side === 'they') { 
+                 window.formState.theyTricks = numValue; 
+                let weTricks = totalTrickPoints - numValue;
+                window.formState.weTricks = weTricks;
+            }
+            window.updateTrickPointsDisplay();
+        };
+
+        window.updateUI = () => {
+            document.getElementById('we-total').textContent = window.weTotal.toLocaleString();
+            document.getElementById('they-total').textContent = window.theyTotal.toLocaleString(); 
+            
+            const history = document.getElementById('score-history');
+            history.innerHTML = '';
+
+            const gameOverBanner = document.getElementById('game-over-banner');
+            const newHandButton = document.getElementById('new-hand-button');
+            
+            if (window.isGameOver) {
+                const winner = window.weTotal >= GAME_WIN_SCORE ? 'WE' : 'THEY'; 
+                const winnerClass = winner === 'WE' ? 'bg-primary' : 'bg-accent';
+                gameOverBanner.innerHTML = `<p class="text-white text-xl font-bold p-3 rounded-xl ${winnerClass} shadow-xl">${winner} WIN! Game Over (Final Score: ${window.weTotal} to ${window.theyTotal})</p>`; 
+                gameOverBanner.classList.remove('hidden');
+                newHandButton.classList.add('opacity-50', 'cursor-not-allowed');
+                newHandButton.disabled = true;
+            } else {
+                gameOverBanner.classList.add('hidden');
+                newHandButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                newHandButton.disabled = false;
+            }
+
+            if (window.gameHands.length === 0) {
+                history.innerHTML = '<p class="text-center text-gray-500 py-4 text-lg">No hands played yet. Tap "New Hand" to start!</p>';
+                return;
+            }
+
+            const sortedHands = [...window.gameHands].reverse();
+
+            sortedHands.forEach((hand, reverseIndex) => {
+                const handIndex = window.gameHands.length - 1 - reverseIndex;
+
+                const handElement = document.createElement('div');
+                const bidMade = hand.bidWinner === 'We' ? hand.weScore > -hand.bid : hand.theyScore > -hand.bid; 
+                const madeClass = bidMade ? 'text-accent' : 'text-red-600';
+                const weClass = hand.bidWinner === 'We' ? 'border-primary bg-blue-50' : 'border-gray-200';
+                const theyClass = hand.bidWinner === 'They' ? 'border-primary bg-blue-50' : 'border-gray-200'; 
+                const weTextClass = hand.weScore < 0 ? 'text-red-600' : 'text-primary';
+                const theyTextClass = hand.theyScore < 0 ? 'text-red-600' : 'text-primary'; 
+                const weTrickDisplay = hand.weTricks + ' Pts';
+                const theyTrickDisplay = hand.theyTricks + ' Pts'; 
+
+                handElement.className = `p-4 mb-3 rounded-xl material-card bg-white relative ${handIndex === window.gameHands.length - 1 && !window.isGameOver ? 'border-4 border-yellow-300' : ''}`;
+                handElement.innerHTML = `
+                    <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                        <span class="text-base font-semibold uppercase text-gray-600">Hand ${handIndex + 1} (Dealer: ${hand.dealer})</span>
+                        ${!window.isGameOver ? `<button onclick="window.openEditModal(${handIndex})" class="material-button bg-yellow-400 text-gray-900 px-3 py-1 text-sm font-bold rounded-full hover:bg-yellow-500 transition-colors">Edit</button>` : `<span class="text-base font-medium text-accent">Trump: ${hand.trump}</span>`}
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-3">
+                        <div class="p-2 rounded-lg border-2 ${weClass}">
+                            <div class="font-bold text-xl text-gray-800">We ${hand.bidWinner === 'We' ? `<span class="${madeClass} text-base">(${bidMade ? 'MADE' : 'SET'} ${hand.bid})</span>` : ''}</div>
+                            <div class="text-base text-gray-600 mt-1">Meld: ${hand.weMeld} | Tricks: ${weTrickDisplay}</div>
+                            <div class="text-2xl font-extrabold ${weTextClass} mt-1">Score: ${hand.weScore > 0 ? '+' : ''}${hand.weScore}</div>
+                        </div>
+                        <div class="p-2 rounded-lg border-2 ${theyClass}">
+                            <div class="font-bold text-xl text-gray-800">They ${hand.bidWinner === 'They' ? `<span class="${madeClass} text-base">(${bidMade ? 'MADE' : 'SET'} ${hand.bid})</span>` : ''}</div>
+                            <div class="text-base text-gray-600 mt-1">Meld: ${hand.theyMeld} | Tricks: ${theyTrickDisplay}</div>
+                            <div class="text-2xl font-extrabold ${theyTextClass} mt-1">Score: ${hand.theyScore > 0 ? '+' : ''}${hand.theyScore}</div>
+                        </div>
+                    </div>
+                `;
+                history.appendChild(handElement);
+            });
+        };
+        
+        window.openEditModal = (handIndex) => {
+            if (window.isGameOver) return;
+
+            window.isEditing = true;
+            window.editingIndex = handIndex;
+            
+            const handToEdit = window.gameHands[handIndex];
+            
+            // Set form state
+            window.formState = {
+                bid: handToEdit.bid, weMeld: handToEdit.weMeld, theyMeld: handToEdit.theyMeld, 
+                weTricks: handToEdit.weTricks, theyTricks: handToEdit.theyTricks, 
+                dealer: handToEdit.dealer, bidWinner: handToEdit.bidWinner, trump: handToEdit.trump
+            };
+
+            document.getElementById('modal-title').textContent = 'Edit Hand ' + (handIndex + 1);
+            document.getElementById('submit-button').textContent = 'Recalculate & Replace Hand';
+            document.getElementById('trump').value = handToEdit.trump;
+            document.getElementById('required-tricks-container').classList.remove('hidden');
+
+            // Update UI elements based on formState
+            window.updateBidDisplay();
+            window.updateDealerDisplay();
+            window.updateBidWinnerDisplay();
+            window.updateMeldDisplay('we');
+            window.updateMeldDisplay('they'); 
+            window.updateTrickPointsDisplay();
+            window.updateModalScore(); 
+            window.updateRequiredTricksDisplay(); 
+
+            document.getElementById('new-hand-modal').classList.remove('hidden');
+        };
+
+        // --- Picker Logic ---
+        
+        window.closeModalOnOutsideClick = (event, modalId) => {
+            if (event.target.id === modalId) {
+                document.getElementById(modalId).classList.add('hidden');
+                // If calculator is closed, re-open the main hand modal
+                if (modalId === 'calculator-modal') {
+                    document.getElementById('new-hand-modal').classList.remove('hidden');
+                }
+            }
+        };
+
+        window.selectDealer = (initial) => {
+            window.formState.dealer = initial;
+            window.updateDealerDisplay();
+            document.getElementById('dealer-picker-modal').classList.add('hidden');
+        };
+
+        window.selectBid = (bidValue) => {
+            window.formState.bid = bidValue;
+            window.updateBidDisplay();
+            document.getElementById('bid-picker-modal').classList.add('hidden');
+        };
+        
+        window.openWeTheyPicker = (field) => { 
+            const pickerModal = document.getElementById('we-they-picker-modal'); 
+            const title = document.getElementById('we-they-picker-title'); 
+            pickerModal.dataset.field = field; 
+
+            if (field === 'bidWinner') {
+                title.textContent = 'Select Bid Winner';
+            } 
+            pickerModal.classList.remove('hidden');
+        }
+
+        window.selectWeThey = (winner) => { 
+            const field = document.getElementById('we-they-picker-modal').dataset.field; 
+            
+            if (field === 'bidWinner') {
+                window.formState.bidWinner = winner;
+                window.updateBidWinnerDisplay();
+            } 
+            document.getElementById('we-they-picker-modal').classList.add('hidden'); 
+        }
+
+        window.openMeldPicker = (side) => {
+            const pickerModal = document.getElementById('meld-picker-modal');
+            document.getElementById('meld-picker-title').textContent = `${side} Meld (20 to 300)`;
+            pickerModal.dataset.side = side;
+            pickerModal.classList.remove('hidden');
+        }
+
+        window.selectMeld = (meldValue) => {
+            const side = document.getElementById('meld-picker-modal').dataset.side;
+            window.formState[`${side}Meld`] = meldValue;
+            window.updateMeldDisplay(side);
+            document.getElementById('meld-picker-modal').classList.add('hidden');
+        }
+        
+        window.openTrickPointsPicker = (side) => {
+            const pickerModal = document.getElementById('trick-points-picker-modal');
+            document.getElementById('trick-points-picker-title').textContent = `Select ${side} Trick Points`;
+            pickerModal.dataset.side = side;
+            pickerModal.classList.remove('hidden');
+        }
+        
+        window.selectTrickPoints = (tricksValue) => {
+            const side = document.getElementById('trick-points-picker-modal').dataset.side;
+            window.handleTricksInput(side, tricksValue);
+            document.getElementById('trick-points-picker-modal').classList.add('hidden');
+        }
+
+        // --- Calculator Logic ---
+        
+        window.openCalculator = (targetField) => {
+            window.calculator.targetField = targetField;
+            window.calculator.currentValue = '0';
+            window.calculator.operand = null;
+            window.calculator.operator = null;
+            window.calculator.awaitingNewInput = false;
+            document.getElementById('calc-display').textContent = '0';
+            document.getElementById('calc-status').textContent = '';
+            
+            document.getElementById('calculator-modal').classList.remove('hidden');
+            document.getElementById('new-hand-modal').classList.add('hidden'); 
+        };
+
+        window.clearCalculator = () => {
+            window.calculator.currentValue = '0';
+            window.calculator.operand = null;
+            window.calculator.operator = null;
+            window.calculator.awaitingNewInput = false;
+            document.getElementById('calc-display').textContent = '0';
+        };
+
+        window.handleCalcInput = (input) => {
+            if (window.calculator.awaitingNewInput) {
+                window.calculator.currentValue = input;
+                window.calculator.awaitingNewInput = false;
+            } else if (window.calculator.currentValue === '0') {
+                window.calculator.currentValue = input;
+            } else if (window.calculator.currentValue.length < 9) { 
+                window.calculator.currentValue += input;
+            }
+            document.getElementById('calc-display').textContent = window.calculator.currentValue;
+        };
+
+        window.handleCalcOperator = (op) => {
+            if (window.calculator.operand === null) {
+                window.calculator.operand = parseFloat(window.calculator.currentValue);
+            } else if (!window.calculator.awaitingNewInput) {
+                window.calculateResult();
+            }
+            window.calculator.operator = op;
+            window.calculator.awaitingNewInput = true;
+        };
+
+        window.calculateResult = () => {
+            if (window.calculator.operator && window.calculator.operand !== null) {
+                const secondOperand = parseFloat(window.calculator.currentValue);
+                let result = 0;
+
+                if (window.calculator.operator === '+') {
+                    result = window.calculator.operand + secondOperand;
+                }
+                
+                window.calculator.operand = result; 
+                window.calculator.currentValue = String(Math.round(result)); 
+                window.calculator.awaitingNewInput = true; 
+
+                document.getElementById('calc-display').textContent = window.calculator.currentValue;
+            }
+        };
+        
+        window.useCalcResult = () => {
+            if (window.calculator.operator && window.calculator.operand !== null && !window.calculator.awaitingNewInput) {
+                 window.calculateResult();
+            } 
+            
+            const result = parseInt(window.calculator.currentValue);
+            const field = window.calculator.targetField;
+            
+            let maxValue = 5000;
+            let targetButtonId = '';
+
+            if (field === 'weMeld' || field === 'theyMeld') { 
+                maxValue = 300;
+                targetButtonId = `${field}DisplayBtn`;
+            }
+
+            if (result < 0 || isNaN(result) || result > maxValue) {
+                document.getElementById('calc-status').textContent = `Error: Result ${result} is outside the valid range (0 - ${maxValue}) or invalid.`;
+                return;
+            }
+
+            window.formState[field] = result;
+            document.getElementById(targetButtonId).textContent = result;
+            
+            document.getElementById('calculator-modal').classList.add('hidden');
+            document.getElementById('new-hand-modal').classList.remove('hidden');
+            document.getElementById('calc-status').textContent = '';
+            
+            // Re-trigger bid status update
+            if (field === 'weMeld' || field === 'theyMeld') {
+                window.updateRequiredTricksDisplay();
+            }
+        };
+
+        window.openModal = () => {
+             if (window.isGameOver) {
+                document.getElementById('status-message').textContent = 'Game is over! Please reset to start a new game.';
+                return;
+            }
+            
+            window.isEditing = false;
+            window.editingIndex = null; // Ensure we clear the editing index
+            
+            // --- MODIFIED TITLE LOGIC ---
+            const lastHand = window.gameHands.length > 0 ? window.gameHands[window.gameHands.length - 1] : null;
+            const lastDealerInitial = lastHand ? lastHand.dealer : 'None';
+            document.getElementById('modal-title').textContent = `New Hand (Last Dealer: ${lastDealerInitial})`;
+            // --- END MODIFIED TITLE LOGIC ---
+            
+            // Reset form state explicitly for a new hand
+            window.formState = {
+                bid: 50, weMeld: 0, theyMeld: 0, weTricks: 0, theyTricks: 0, 
+                dealer: lastDealerInitial === 'None' ? 'Select' : lastDealerInitial, // Set dealer default to last dealer
+                bidWinner: 'We', // Set default bid winner
+                trump: 'S'
+            };
+            
+            document.getElementById('submit-button').textContent = 'Calculate & Save';
+            document.getElementById('trump').value = window.formState.trump;
+            document.getElementById('required-tricks-container').classList.add('hidden'); 
+
+            // Update all dynamic displays (bundled)
+            window.updateBidDisplay();
+            window.updateDealerDisplay();
+            window.updateBidWinnerDisplay();
+            window.updateMeldDisplay('we');
+            window.updateMeldDisplay('they'); 
+            window.updateTrickPointsDisplay();
+            window.updateModalScore(); 
+            window.updateRequiredTricksDisplay(); // Centralized trigger retained
+            
+            document.getElementById('new-hand-modal').classList.remove('hidden');
+        }
+
+        window.calculateScoreForHand = () => {
+            const { bid, weMeld, theyMeld, weTricks, theyTricks, bidWinner } = window.formState; 
+            
+            const totalTrickPoints = weTricks + theyTricks; 
+            if (totalTrickPoints !== 50) {
+                throw new Error(`Total Trick Points must equal 50. Currently ${totalTrickPoints}. Please adjust We/They Tricks.`); 
+            }
+            if (bid < 50) {
+                throw new Error("Bid amount cannot be less than 50.");
+            }
+            
+            const weTotalPoints = weMeld + weTricks;
+            const theyTotalPoints = theyMeld + theyTricks; 
+            
+            const weMetBid = weTotalPoints >= bid;
+            const theyMetBid = theyTotalPoints >= bid;
+            const weMetTrickMinimum = weTricks >= MIN_TRICK_PTS_TO_SCORE;
+            const theyMetTrickMinimum = theyTricks >= MIN_TRICK_PTS_TO_SCORE;
+
+            let finalWeScore = 0;
+            let finalTheyScore = 0; 
+
+            if (bidWinner === 'We') {
+                if (weMetBid && weMetTrickMinimum) {
+                    // WE Success: Made bid AND met the 20 trick minimum
+                    finalWeScore = weTotalPoints;
+                } else {
+                    // WE Failure: Failed bid amount OR failed 20 trick minimum
+                    finalWeScore = -bid; 
+                }
+                
+                // THEY (Opponent) Scoring
+                if (theyTricks < MIN_TRICK_PTS_TO_SCORE) { 
+                    finalTheyScore = 0; 
+                } else {
+                    const theyMeldScore = theyMeld > 0 && theyMeld < MIN_MELD_TO_COUNT ? 0 : theyMeld; 
+                    finalTheyScore = theyTricks + theyMeldScore; 
+                }
+
+            } else { // bidWinner === 'They'
+                if (theyMetBid && theyMetTrickMinimum) { 
+                    // THEY Success: Made bid AND met the 20 trick minimum
+                    finalTheyScore = theyTotalPoints; 
+                } else {
+                    // THEY Failure: Failed bid amount OR failed 20 trick minimum
+                    finalTheyScore = -bid; 
+                }
+                
+                // WE (Opponent) Scoring
+                if (weTricks < MIN_TRICK_PTS_TO_SCORE) {
+                    finalWeScore = 0;
+                } else {
+                    const weMeldScore = weMeld > 0 && weMeld < MIN_MELD_TO_COUNT ? 0 : weMeld;
+                    finalWeScore = weTricks + weMeldScore;
+                }
+            }
+
+            return { weScore: finalWeScore, theyScore: finalTheyScore }; 
+        };
+
+
+        window.submitNewHand = (event) => {
+            event.preventDefault();
+            document.getElementById('hand-status').textContent = 'Calculating and Saving...';
+            
+            try {
+                if (!window.formState.dealer || window.formState.dealer === 'Select') {
+                    throw new Error("Please select the Dealer's single capital initial.");
+                }
+                
+                if (window.formState.weMeld > 0 && window.formState.weMeld < 20) {
+                    throw new Error("We Meld must be 0 or at least 20.");
+                }
+                 if (window.formState.theyMeld > 0 && window.formState.theyMeld < 20) { 
+                    throw new Error("They Meld must be 0 or at least 20."); 
+                }
+                
+                const { weScore, theyScore } = window.calculateScoreForHand(); 
+
+                const handData = {
+                    ...window.formState,
+                    weScore: weScore,
+                    theyScore: theyScore, 
+                    timestamp: new Date().getTime()
+                };
+                
+                // Pass the editing index (null if new hand)
+                const handIndex = window.editingIndex;
+
+                // Save uses local storage now, recalculating all totals
+                window.saveHand(handData, handIndex);
+
+            } catch (error) {
+                document.getElementById('hand-status').textContent = `Error: ${error.message}`;
+                console.error("Submission Error:", error);
+            }
+        };
+        
+        window.openResetConfirmation = () => {
+            document.getElementById('reset-confirmation-modal').classList.remove('hidden');
+        };
+
+        // --- Calculator Logic Initialization (same as previous working version) ---
+        
+        window.clearCalculator = () => {
+            window.calculator.currentValue = '0';
+            window.calculator.operand = null;
+            window.calculator.operator = null;
+            window.calculator.awaitingNewInput = false;
+            document.getElementById('calc-display').textContent = '0';
+        };
+
+        window.handleCalcInput = (input) => {
+            if (window.calculator.awaitingNewInput) {
+                window.calculator.currentValue = input;
+                window.calculator.awaitingNewInput = false;
+            } else if (window.calculator.currentValue === '0') {
+                window.calculator.currentValue = input;
+            } else if (window.calculator.currentValue.length < 9) { 
+                window.calculator.currentValue += input;
+            }
+            document.getElementById('calc-display').textContent = window.calculator.currentValue;
+        };
+
+        window.handleCalcOperator = (op) => {
+            if (window.calculator.operand === null) {
+                window.calculator.operand = parseFloat(window.calculator.currentValue);
+            } else if (!window.calculator.awaitingNewInput) {
+                window.calculateResult();
+            }
+            window.calculator.operator = op;
+            window.calculator.awaitingNewInput = true;
+        };
+
+        window.calculateResult = () => {
+            if (window.calculator.operator && window.calculator.operand !== null) {
+                const secondOperand = parseFloat(window.calculator.currentValue);
+                let result = 0;
+
+                if (window.calculator.operator === '+') {
+                    result = window.calculator.operand + secondOperand;
+                }
+                
+                window.calculator.operand = result; 
+                window.calculator.currentValue = String(Math.round(result)); 
+                window.calculator.awaitingNewInput = true; 
+
+                document.getElementById('calc-display').textContent = window.calculator.currentValue;
+            }
+        };
+        
+        window.useCalcResult = () => {
+            if (window.calculator.operator && window.calculator.operand !== null && !window.calculator.awaitingNewInput) {
+                 window.calculateResult();
+            } 
+            
+            const result = parseInt(window.calculator.currentValue);
+            const field = window.calculator.targetField;
+            
+            let maxValue = 5000;
+            let targetButtonId = '';
+
+            if (field === 'weMeld' || field === 'theyMeld') { 
+                maxValue = 300;
+                targetButtonId = `${field}DisplayBtn`;
+            }
+
+            if (result < 0 || isNaN(result) || result > maxValue) {
+                document.getElementById('calc-status').textContent = `Error: Result ${result} is outside the valid range (0 - ${maxValue}) or invalid.`;
+                return;
+            }
+
+            window.formState[field] = result;
+            document.getElementById(targetButtonId).textContent = result;
+            
+            document.getElementById('calculator-modal').classList.add('hidden');
+            document.getElementById('new-hand-modal').classList.remove('hidden');
+            document.getElementById('calc-status').textContent = '';
+            
+            // Re-trigger bid status update
+            if (field === 'weMeld' || field === 'theyMeld') {
+                window.updateRequiredTricksDisplay();
+            }
+        };
+
+        window.openCalculator = (targetField) => {
+            window.calculator.targetField = targetField;
+            window.calculator.currentValue = '0';
+            window.calculator.operand = null;
+            window.calculator.operator = null;
+            window.calculator.awaitingNewInput = false;
+            document.getElementById('calc-display').textContent = '0';
+            document.getElementById('calc-status').textContent = '';
+            
+            document.getElementById('calculator-modal').classList.remove('hidden');
+            document.getElementById('new-hand-modal').classList.add('hidden'); 
+        };
+
+        // --- Initialization on Window Load ---
+        window.onload = () => {
+            
+            // Picker button initialization (same as before)
+            const bidPickerContainer = document.getElementById('bid-picker-container');
+            window.BID_OPTIONS.forEach(bid => {
+                const button = document.createElement('button');
+                button.textContent = bid;
+                button.type = 'button';
+                button.onclick = () => window.selectBid(bid);
+                button.className = 'p-3 rounded-lg font-bold text-center material-button bg-gray-100 text-gray-800 hover:bg-primary hover:text-white transition-colors duration-150';
+                bidPickerContainer.appendChild(button);
+            });
+            
+            const dealerPickerContainer = document.getElementById('dealer-picker-container');
+            window.DEALER_INITIALS.forEach(initial => {
+                const button = document.createElement('button');
+                button.textContent = initial;
+                button.type = 'button';
+                button.onclick = () => window.selectDealer(initial);
+                button.className = 'p-3 rounded-lg font-bold text-center material-button bg-gray-100 text-gray-800 hover:bg-primary hover:text-white transition-colors duration-150';
+                dealerPickerContainer.appendChild(button);
+            });
+            
+            const meldPickerContainer = document.getElementById('meld-picker-container');
+            const zeroButton = document.createElement('button');
+            zeroButton.textContent = '0';
+            zeroButton.type = 'button';
+            zeroButton.onclick = () => window.selectMeld(0);
+            zeroButton.className = 'p-3 rounded-lg font-bold text-center material-button bg-red-100 text-red-600 hover:bg-primary hover:text-white transition-colors duration-150';
+            meldPickerContainer.appendChild(zeroButton);
+            
+            for(let meld = 20; meld <= 300; meld++) {
+                const button = document.createElement('button');
+                button.textContent = meld;
+                button.type = 'button';
+                button.onclick = () => window.selectMeld(meld);
+                let colorClass = 'bg-gray-100 text-gray-800';
+                if (meld === 20 || meld % 50 === 0) {
+                     colorClass = 'bg-blue-200 text-primary font-extrabold';
+                }
+                button.className = `p-3 rounded-lg font-bold text-center material-button ${colorClass} hover:bg-primary hover:text-white transition-colors duration-150`;
+                meldPickerContainer.appendChild(button);
+            }
+
+            const trickPointsPickerContainer = document.getElementById('trick-points-picker-container');
+            window.TRICK_OPTIONS.forEach(tricks => {
+                const button = document.createElement('button');
+                button.textContent = tricks;
+                button.type = 'button';
+                button.onclick = () => window.selectTrickPoints(tricks);
+                const color = tricks === 0 || tricks === 50 ? 'bg-blue-200 text-primary' : 'bg-gray-100 text-gray-800';
+                button.className = `p-3 rounded-lg font-bold text-center material-button ${color} hover:bg-accent hover:text-white transition-colors duration-150`;
+                trickPointsPickerContainer.appendChild(button);
+            });
+
+            window.updateBidWinnerDisplay();
+            // Load scores from Local Storage immediately
+            window.loadScores(); 
+        };
+    </script>
+
+
+</body>
+</html>
+
